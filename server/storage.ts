@@ -1,36 +1,34 @@
-
 import { db } from "./db";
-import { eq, desc, and, ilike, sql } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { 
-  users, bookmarks, apiTokens, systemSettings,
-  type User, type InsertUser, type Bookmark, type InsertBookmark, 
+  bookmarks, apiTokens, systemSettings,
+  type Bookmark, type InsertBookmark, 
   type ApiToken, type SystemSetting
 } from "@shared/schema";
+import { users, type User } from "@shared/models/auth";
 
 export interface IStorage {
-  // Users (in addition to auth/storage.ts)
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  updateUserAdmin(id: number, isAdmin: boolean): Promise<User>;
+  // Users
+  getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   
   // Bookmarks
   getBookmarks(options: { 
-    userId?: number, // If provided, filter by user
+    userId?: string,
     page: number, 
     limit: number,
     search?: string,
-    isPublic?: boolean // If true, only public. If undefined, all.
+    isPublic?: boolean
   }): Promise<{ items: (Bookmark & { username?: string })[], total: number }>;
   
   getBookmark(id: number): Promise<Bookmark | undefined>;
-  createBookmark(bookmark: InsertBookmark & { userId: number }): Promise<Bookmark>;
+  createBookmark(bookmark: InsertBookmark & { userId: string }): Promise<Bookmark>;
   updateBookmark(id: number, updates: Partial<InsertBookmark>): Promise<Bookmark>;
   deleteBookmark(id: number): Promise<void>;
 
   // API Tokens
-  getApiTokens(userId: number): Promise<ApiToken[]>;
-  createApiToken(userId: number, token: string, label?: string): Promise<ApiToken>;
+  getApiTokens(userId: string): Promise<ApiToken[]>;
+  createApiToken(userId: string, token: string, label?: string): Promise<ApiToken>;
   deleteApiToken(id: number): Promise<void>;
   getUserByToken(token: string): Promise<User | undefined>;
 
@@ -40,34 +38,18 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // User methods
-  async getUser(id: number): Promise<User | undefined> {
+  async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    const [newUser] = await db.insert(users).values(user).returning();
-    return newUser;
-  }
-  
-  async updateUserAdmin(id: number, isAdmin: boolean): Promise<User> {
-    const [updatedUser] = await db
-      .update(users)
-      .set({ isAdmin })
-      .where(eq(users.id, id))
-      .returning();
-    return updatedUser;
-  }
-
-  // Bookmark methods
   async getBookmarks(options: { 
-    userId?: number, 
+    userId?: string, 
     page: number, 
     limit: number,
     search?: string,
@@ -75,7 +57,6 @@ export class DatabaseStorage implements IStorage {
   }): Promise<{ items: (Bookmark & { username?: string })[], total: number }> {
     const offset = (options.page - 1) * options.limit;
     
-    // Build where clause
     const conditions = [];
     if (options.userId) {
       conditions.push(eq(bookmarks.userId, options.userId));
@@ -85,7 +66,6 @@ export class DatabaseStorage implements IStorage {
     }
     if (options.search) {
       conditions.push(
-        // Simple search in title, url, description
         sql`(${bookmarks.title} ILIKE ${`%${options.search}%`} OR ${bookmarks.url} ILIKE ${`%${options.search}%`} OR ${bookmarks.description} ILIKE ${`%${options.search}%`})`
       );
     }
@@ -99,11 +79,10 @@ export class DatabaseStorage implements IStorage {
       
     const total = Number(countResult.count);
     
-    // Join with users to get username for public feed
     const items = await db
       .select({
         ...bookmarks,
-        username: users.username,
+        username: users.firstName,
       })
       .from(bookmarks)
       .leftJoin(users, eq(bookmarks.userId, users.id))
@@ -120,7 +99,7 @@ export class DatabaseStorage implements IStorage {
     return bookmark;
   }
 
-  async createBookmark(bookmark: InsertBookmark & { userId: number }): Promise<Bookmark> {
+  async createBookmark(bookmark: InsertBookmark & { userId: string }): Promise<Bookmark> {
     const [newBookmark] = await db.insert(bookmarks).values(bookmark).returning();
     return newBookmark;
   }
@@ -138,12 +117,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(bookmarks).where(eq(bookmarks.id, id));
   }
 
-  // API Token methods
-  async getApiTokens(userId: number): Promise<ApiToken[]> {
+  async getApiTokens(userId: string): Promise<ApiToken[]> {
     return await db.select().from(apiTokens).where(eq(apiTokens.userId, userId));
   }
 
-  async createApiToken(userId: number, token: string, label?: string): Promise<ApiToken> {
+  async createApiToken(userId: string, token: string, label?: string): Promise<ApiToken> {
     const [newToken] = await db.insert(apiTokens).values({ userId, token, label }).returning();
     return newToken;
   }
@@ -153,7 +131,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByToken(token: string): Promise<User | undefined> {
-    // Join tokens with user to get user info
     const result = await db
       .select({ user: users })
       .from(apiTokens)
@@ -164,7 +141,6 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.user;
   }
 
-  // System Settings methods
   async getSystemSetting(key: string): Promise<string | undefined> {
     const [setting] = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
     return setting?.value;
