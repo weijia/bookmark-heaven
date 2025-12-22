@@ -54,6 +54,28 @@ export async function registerRoutes(
     return res.status(401).json({ message: "Unauthorized" });
   };
 
+  // --- Auth Status ---
+  app.get(api.auth.me.path, (req: any, res) => {
+    if (!req.isAuthenticated()) {
+      return res.json(null);
+    }
+    // Return user from Replit Auth session
+    res.json({
+      id: req.user.claims.sub,
+      email: req.user.claims.email,
+      firstName: req.user.claims.first_name,
+      lastName: req.user.claims.last_name,
+      profileImageUrl: req.user.claims.profile_image_url,
+    });
+  });
+
+  app.post(api.auth.logout.path, (req: any, res) => {
+    req.logout((err: any) => {
+      if (err) return res.status(500).json({ message: "Logout failed" });
+      res.json({ message: "Logged out" });
+    });
+  });
+
   // --- Bookmarks ---
   app.get(api.bookmarks.list.path, async (req, res) => {
     try {
