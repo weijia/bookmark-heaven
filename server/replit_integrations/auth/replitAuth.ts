@@ -51,6 +51,7 @@ function updateUserSession(
 }
 
 async function upsertUser(claims: any) {
+  // Use 'sub' (subject) from OIDC claims as the user ID
   await authStorage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
