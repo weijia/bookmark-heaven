@@ -6,7 +6,7 @@ import { BookmarkDialog } from "@/components/bookmark-dialog";
 import { Pagination } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Loader2 } from "lucide-react";
+import { Plus, Search, Loader2, Bookmark } from "lucide-react";
 import { type BookmarkResponse } from "@shared/schema";
 import Layout from "@/components/layout";
 
@@ -42,8 +42,8 @@ export default function Home() {
   }
 
   if (!user) {
-    // Redirect logic usually in App or Layout, but simple fallback here
-    window.location.href = "/login";
+    // Redirect to Replit Auth login
+    window.location.href = "/api/login";
     return null;
   }
 

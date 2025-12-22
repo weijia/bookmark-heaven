@@ -77,7 +77,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ) : (
           <Button 
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-            onClick={() => window.location.href = '/login'}
+            onClick={() => window.location.href = '/api/login'}
           >
             Login
           </Button>
