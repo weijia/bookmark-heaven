@@ -9,12 +9,14 @@ import { users, type User } from "@shared/models/auth";
 
 export interface IStorage {
   // Users
-  getUser(id: string): Promise<User | undefined>;
+  getUser(id: number): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(username: string, email: string, passwordHash: string): Promise<User>;
   
   // Bookmarks
   getBookmarks(options: { 
-    userId?: string,
+    userId?: number,
     page: number, 
     limit: number,
     search?: string,
@@ -22,13 +24,13 @@ export interface IStorage {
   }): Promise<{ items: (Bookmark & { username?: string })[], total: number }>;
   
   getBookmark(id: number): Promise<Bookmark | undefined>;
-  createBookmark(bookmark: InsertBookmark & { userId: string }): Promise<Bookmark>;
+  createBookmark(bookmark: InsertBookmark & { userId: number }): Promise<Bookmark>;
   updateBookmark(id: number, updates: Partial<InsertBookmark>): Promise<Bookmark>;
   deleteBookmark(id: number): Promise<void>;
 
   // API Tokens
-  getApiTokens(userId: string): Promise<ApiToken[]>;
-  createApiToken(userId: string, token: string, label?: string): Promise<ApiToken>;
+  getApiTokens(userId: number): Promise<ApiToken[]>;
+  createApiToken(userId: number, token: string, label?: string): Promise<ApiToken>;
   deleteApiToken(id: number): Promise<void>;
   getUserByToken(token: string): Promise<User | undefined>;
 
@@ -38,7 +40,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getUser(id: string): Promise<User | undefined> {
+  async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
@@ -48,8 +50,18 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(username: string, email: string, passwordHash: string): Promise<User> {
+    const [user] = await db.insert(users).values({ username, email, passwordHash }).returning();
+    return user;
+  }
+
   async getBookmarks(options: { 
-    userId?: string, 
+    userId?: number, 
     page: number, 
     limit: number,
     search?: string,
@@ -99,7 +111,7 @@ export class DatabaseStorage implements IStorage {
     return bookmark;
   }
 
-  async createBookmark(bookmark: InsertBookmark & { userId: string }): Promise<Bookmark> {
+  async createBookmark(bookmark: InsertBookmark & { userId: number }): Promise<Bookmark> {
     const [newBookmark] = await db.insert(bookmarks).values(bookmark).returning();
     return newBookmark;
   }
@@ -117,11 +129,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(bookmarks).where(eq(bookmarks.id, id));
   }
 
-  async getApiTokens(userId: string): Promise<ApiToken[]> {
+  async getApiTokens(userId: number): Promise<ApiToken[]> {
     return await db.select().from(apiTokens).where(eq(apiTokens.userId, userId));
   }
 
-  async createApiToken(userId: string, token: string, label?: string): Promise<ApiToken> {
+  async createApiToken(userId: number, token: string, label?: string): Promise<ApiToken> {
     const [newToken] = await db.insert(apiTokens).values({ userId, token, label }).returning();
     return newToken;
   }

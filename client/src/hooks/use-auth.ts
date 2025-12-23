@@ -1,47 +1,50 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { User } from "@shared/models/auth";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@shared/routes";
 
-async function fetchUser(): Promise<User | null> {
-  const response = await fetch("/api/auth/user", {
-    credentials: "include",
-  });
-
-  if (response.status === 401) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-async function logout(): Promise<void> {
-  window.location.href = "/api/logout";
-}
-
-export function useAuth() {
+export function useLogin() {
   const queryClient = useQueryClient();
-  const { data: user, isLoading } = useQuery<User | null>({
-    queryKey: ["/api/auth/user"],
-    queryFn: fetchUser,
-    retry: false,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: logout,
+  return useMutation({
+    mutationFn: async (data: { username: string; password: string }) => {
+      const res = await fetch(api.auth.login.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Login failed");
+      }
+      return api.auth.login.responses[200].parse(await res.json());
+    },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
     },
   });
+}
 
-  return {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    logout: logoutMutation.mutate,
-    isLoggingOut: logoutMutation.isPending,
-  };
+export function useRegister() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      username: string;
+      email: string;
+      password: string;
+    }) => {
+      const res = await fetch(api.auth.register.path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Registration failed");
+      }
+      return api.auth.register.responses[201].parse(await res.json());
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.auth.me.path] });
+    },
+  });
 }

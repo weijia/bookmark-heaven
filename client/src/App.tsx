@@ -15,9 +15,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={AdminLogin} />
       <Route path="/public" component={PublicFeed} />
       <Route path="/settings" component={Settings} />
-      <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />
     </Switch>

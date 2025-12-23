@@ -42,8 +42,8 @@ export default function Home() {
   }
 
   if (!user) {
-    // Redirect to Replit Auth login
-    window.location.href = "/api/login";
+    // Redirect to login page
+    window.location.href = "/login";
     return null;
   }
 

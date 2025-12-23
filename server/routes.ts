@@ -3,10 +3,13 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import crypto from "crypto";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
+import passport from "passport";
+import { Strategy as LocalStrategy } from "passport-local";
 
 const scryptAsync = promisify(scrypt);
 
@@ -27,9 +30,54 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup Replit Auth first
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  // Setup local authentication with sessions
+  app.set("trust proxy", 1);
+  
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: false,
+    ttl: 7 * 24 * 60 * 60,
+    tableName: "sessions",
+  });
+
+  app.use(session({
+    secret: process.env.SESSION_SECRET!,
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { httpOnly: true, secure: true, maxAge: 7 * 24 * 60 * 60 * 1000 },
+  }));
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  // Local strategy
+  passport.use(new LocalStrategy(async (username, password, done) => {
+    try {
+      const user = await storage.getUserByUsername(username);
+      if (!user || !user.passwordHash) {
+        return done(null, false, { message: "Invalid username or password" });
+      }
+      const match = await comparePassword(user.passwordHash, password);
+      if (!match) {
+        return done(null, false, { message: "Invalid username or password" });
+      }
+      return done(null, user);
+    } catch (err) {
+      return done(err);
+    }
+  }));
+
+  passport.serializeUser((user: any, done) => done(null, user.id));
+  passport.deserializeUser(async (id: number, done) => {
+    try {
+      const user = await storage.getUser(id);
+      done(null, user);
+    } catch (err) {
+      done(err);
+    }
+  });
 
   // Auth middleware
   const requireAuth = (req: any, res: any, next: any) => {
@@ -54,19 +102,46 @@ export async function registerRoutes(
     return res.status(401).json({ message: "Unauthorized" });
   };
 
-  // --- Auth Status ---
+  // --- Auth Routes ---
+  app.post(api.auth.register.path, async (req: any, res) => {
+    try {
+      const { username, email, password } = api.auth.register.input.parse(req.body);
+      
+      const existing = await storage.getUserByUsername(username);
+      if (existing) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+      
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+      
+      const passwordHash = await hashPassword(password);
+      const user = await storage.createUser(username, email, passwordHash);
+      
+      // Log user in
+      req.login(user, (err: any) => {
+        if (err) return res.status(500).json({ message: "Login failed" });
+        res.status(201).json(user);
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
+      res.status(500).json({ message: "Registration failed" });
+    }
+  });
+
+  app.post(api.auth.login.path, passport.authenticate("local"), (req: any, res) => {
+    res.json(req.user);
+  });
+
   app.get(api.auth.me.path, (req: any, res) => {
     if (!req.isAuthenticated()) {
       return res.json(null);
     }
-    // Return user from Replit Auth session
-    res.json({
-      id: req.user.claims.sub,
-      email: req.user.claims.email,
-      firstName: req.user.claims.first_name,
-      lastName: req.user.claims.last_name,
-      profileImageUrl: req.user.claims.profile_image_url,
-    });
+    res.json(req.user);
   });
 
   app.post(api.auth.logout.path, (req: any, res) => {
@@ -84,12 +159,12 @@ export async function registerRoutes(
       const search = req.query.search as string;
       const isPublic = req.query.isPublic === 'true' ? true : req.query.isPublic === 'false' ? false : undefined;
       
-      let userId: string | undefined = undefined;
+      let userId: number | undefined = undefined;
       
       // If asking for non-public bookmarks, must be authenticated
       if (isPublic !== true) {
         if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-        userId = req.user.claims.sub;
+        userId = req.user.id;
       }
 
       const result = await storage.getBookmarks({
@@ -113,12 +188,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post(api.bookmarks.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.bookmarks.create.path, requireAuth, async (req: any, res) => {
     try {
       const input = api.bookmarks.create.input.parse(req.body);
       const bookmark = await storage.createBookmark({
         ...input,
-        userId: req.user.claims.sub
+        userId: req.user.id
       });
       res.status(201).json(bookmark);
     } catch (err) {
@@ -129,7 +204,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch(api.bookmarks.update.path, isAuthenticated, async (req: any, res) => {
+  app.patch(api.bookmarks.update.path, requireAuth, async (req: any, res) => {
     try {
       const id = Number(req.params.id);
       const bookmark = await storage.getBookmark(id);
@@ -148,7 +223,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.bookmarks.delete.path, isAuthenticated, async (req: any, res) => {
+  app.delete(api.bookmarks.delete.path, requireAuth, async (req: any, res) => {
     const id = Number(req.params.id);
     const bookmark = await storage.getBookmark(id);
     
@@ -160,25 +235,25 @@ export async function registerRoutes(
   });
 
   // --- API Tokens ---
-  app.get(api.tokens.list.path, isAuthenticated, async (req: any, res) => {
-    const tokens = await storage.getApiTokens(req.user.claims.sub);
+  app.get(api.tokens.list.path, requireAuth, async (req: any, res) => {
+    const tokens = await storage.getApiTokens(req.user.id);
     res.json(tokens);
   });
 
-  app.post(api.tokens.create.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.tokens.create.path, requireAuth, async (req: any, res) => {
     const label = req.body.label;
     const token = crypto.randomBytes(32).toString('hex');
-    const newToken = await storage.createApiToken(req.user.claims.sub, token, label);
+    const newToken = await storage.createApiToken(req.user.id, token, label);
     res.status(201).json(newToken);
   });
 
-  app.delete(api.tokens.delete.path, isAuthenticated, async (req: any, res) => {
+  app.delete(api.tokens.delete.path, requireAuth, async (req: any, res) => {
     await storage.deleteApiToken(Number(req.params.id));
     res.status(204).send();
   });
 
   // --- Admin ---
-  app.post(api.admin.changePassword.path, isAuthenticated, async (req: any, res) => {
+  app.post(api.admin.changePassword.path, requireAuth, async (req: any, res) => {
     // For MVP, check if user is admin by email/settings
     // Since we don't have an admin flag yet, allow any authenticated user to be admin
     

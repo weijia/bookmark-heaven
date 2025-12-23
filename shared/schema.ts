@@ -1,7 +1,7 @@
-// Export auth models (required by Replit Auth integration)
+// Export auth models
 export * from "./models/auth";
 
-import { pgTable, text, serial, varchar, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, varchar, boolean, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./models/auth";
@@ -9,7 +9,7 @@ import { users } from "./models/auth";
 // Bookmarks table
 export const bookmarks = pgTable("bookmarks", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   url: text("url").notNull(),
   description: text("description"),
@@ -19,7 +19,7 @@ export const bookmarks = pgTable("bookmarks", {
 
 export const apiTokens = pgTable("api_tokens", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").references(() => users.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
   token: text("token").notNull().unique(),
   label: text("label"),
   createdAt: timestamp("created_at").defaultNow(),
