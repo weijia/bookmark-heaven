@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useUser, useLogout } from "@/hooks/use-user";
-import { Bookmark, Globe, Settings, LogOut, ShieldCheck, Menu } from "lucide-react";
+import { Bookmark, Globe, Settings, LogOut, ShieldCheck, Menu, Code } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -44,6 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <nav className="space-y-1.5 flex-1">
         <NavItem href="/" icon={Bookmark} label="My Bookmarks" />
         <NavItem href="/public" icon={Globe} label="Public Feed" />
+        <NavItem href="/api-docs" icon={Code} label="API Docs" />
         <div className="py-4">
           <div className="h-px bg-border/60 mx-3" />
         </div>
@@ -77,7 +78,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         ) : (
           <Button 
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-            onClick={() => window.location.href = '/api/login'}
+            onClick={() => window.location.href = '/login'}
           >
             Login
           </Button>

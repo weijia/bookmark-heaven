@@ -9,6 +9,7 @@ import PublicFeed from "@/pages/public-feed";
 import Settings from "@/pages/settings";
 import AdminLogin from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import ApiDocs from "@/pages/api-docs";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/login" component={AdminLogin} />
       <Route path="/public" component={PublicFeed} />
       <Route path="/settings" component={Settings} />
+      <Route path="/api-docs" component={ApiDocs} />
       <Route path="/admin" component={AdminDashboard} />
       <Route component={NotFound} />
     </Switch>
