@@ -210,7 +210,7 @@ export async function registerRoutes(
       const bookmark = await storage.getBookmark(id);
       
       if (!bookmark) return res.status(404).json({ message: "Not found" });
-      if (bookmark.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+      if (bookmark.userId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
 
       const input = api.bookmarks.update.input.parse(req.body);
       const updated = await storage.updateBookmark(id, input);
@@ -228,7 +228,7 @@ export async function registerRoutes(
     const bookmark = await storage.getBookmark(id);
     
     if (!bookmark) return res.status(404).json({ message: "Not found" });
-    if (bookmark.userId !== req.user.claims.sub) return res.status(403).json({ message: "Forbidden" });
+    if (bookmark.userId !== req.user.id) return res.status(403).json({ message: "Forbidden" });
 
     await storage.deleteBookmark(id);
     res.status(204).send();
