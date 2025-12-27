@@ -84,14 +84,14 @@ export class DatabaseStorage implements IStorage {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const [countResult] = await db
+    const [countResult] = await getDb()
       .select({ count: sql<number>`count(*)` })
       .from(bookmarks)
       .where(whereClause);
       
     const total = Number(countResult.count);
     
-    const items = await db
+    const items = await getDb()
       .select({
         ...bookmarks,
         username: users.firstName,
@@ -117,7 +117,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateBookmark(id: number, updates: Partial<InsertBookmark>): Promise<Bookmark> {
-    const [updated] = await db
+    const [updated] = await getDb()
       .update(bookmarks)
       .set(updates)
       .where(eq(bookmarks.id, id))
