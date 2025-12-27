@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { getDbInstance as getDb } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { 
   bookmarks, apiTokens, systemSettings,
@@ -41,22 +41,22 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await getDb().select().from(users).where(eq(users.id, id));
     return user;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await getDb().select().from(users).where(eq(users.email, email));
     return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await getDb().select().from(users).where(eq(users.username, username));
     return user;
   }
 
   async createUser(username: string, email: string, passwordHash: string): Promise<User> {
-    const [user] = await db.insert(users).values({ username, email, passwordHash }).returning();
+    const [user] = await getDb().insert(users).values({ username, email, passwordHash }).returning();
     return user;
   }
 
@@ -107,12 +107,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBookmark(id: number): Promise<Bookmark | undefined> {
-    const [bookmark] = await db.select().from(bookmarks).where(eq(bookmarks.id, id));
+    const [bookmark] = await getDb().select().from(bookmarks).where(eq(bookmarks.id, id));
     return bookmark;
   }
 
   async createBookmark(bookmark: InsertBookmark & { userId: number }): Promise<Bookmark> {
-    const [newBookmark] = await db.insert(bookmarks).values(bookmark).returning();
+    const [newBookmark] = await getDb().insert(bookmarks).values(bookmark).returning();
     return newBookmark;
   }
 
@@ -126,20 +126,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteBookmark(id: number): Promise<void> {
-    await db.delete(bookmarks).where(eq(bookmarks.id, id));
+    await getDb().delete(bookmarks).where(eq(bookmarks.id, id));
   }
 
   async getApiTokens(userId: number): Promise<ApiToken[]> {
-    return await db.select().from(apiTokens).where(eq(apiTokens.userId, userId));
+    return await getDb().select().from(apiTokens).where(eq(apiTokens.userId, userId));
   }
 
   async createApiToken(userId: number, token: string, label?: string): Promise<ApiToken> {
-    const [newToken] = await db.insert(apiTokens).values({ userId, token, label }).returning();
+    const [newToken] = await getDb().insert(apiTokens).values({ userId, token, label }).returning();
     return newToken;
   }
 
   async deleteApiToken(id: number): Promise<void> {
-    await db.delete(apiTokens).where(eq(apiTokens.id, id));
+    await getDb().delete(apiTokens).where(eq(apiTokens.id, id));
   }
 
   async getUserByToken(token: string): Promise<User | undefined> {
@@ -154,7 +154,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSystemSetting(key: string): Promise<string | undefined> {
-    const [setting] = await db.select().from(systemSettings).where(eq(systemSettings.key, key));
+    const [setting] = await getDb().select().from(systemSettings).where(eq(systemSettings.key, key));
     return setting?.value;
   }
 
