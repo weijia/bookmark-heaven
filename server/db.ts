@@ -23,7 +23,10 @@ function getPool(): pg.Pool {
 
 function getDb() {
   if (!dbInstance) {
-    dbInstance = drizzle(getPool(), { schema: { ...schema, ...authSchema } });
+    dbInstance = drizzle(getPool(), { 
+      schema: { ...schema, ...authSchema },
+      casing: 'snake_case'
+    });
   }
   return dbInstance;
 }

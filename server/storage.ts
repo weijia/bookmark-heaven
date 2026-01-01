@@ -143,7 +143,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByToken(token: string): Promise<User | undefined> {
-    const result = await db
+    const result = await getDb()
       .select({ user: users })
       .from(apiTokens)
       .innerJoin(users, eq(apiTokens.userId, users.id))
@@ -159,7 +159,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async setSystemSetting(key: string, value: string): Promise<void> {
-    await db
+    await getDb()
       .insert(systemSettings)
       .values({ key, value })
       .onConflictDoUpdate({
