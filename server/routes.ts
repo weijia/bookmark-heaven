@@ -163,8 +163,24 @@ export async function registerRoutes(
       
       // If asking for non-public bookmarks, must be authenticated
       if (isPublic !== true) {
-        if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-        userId = req.user.id;
+        if (!req.isAuthenticated()) {
+          // Check for API Token if session is not authenticated
+          const authHeader = req.headers.authorization;
+          if (authHeader && authHeader.startsWith("Bearer ")) {
+            const token = authHeader.substring(7);
+            const user = await storage.getUserByToken(token);
+            if (user) {
+              req.user = user;
+              userId = user.id;
+            } else {
+              return res.status(401).json({ message: "Unauthorized" });
+            }
+          } else {
+            return res.status(401).json({ message: "Unauthorized" });
+          }
+        } else {
+          userId = req.user.id;
+        }
       }
 
       const result = await storage.getBookmarks({
